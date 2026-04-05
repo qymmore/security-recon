@@ -79,18 +79,7 @@ cd recon-platform
 
 ---
 
-### 2. Configure Environment Variables
-
-Create a `.env` file:
-
-```env
-DATABASE_URL=postgresql://user:password@db:5432/recon
-REDIS_URL=redis://redis:6379/0
-```
-
----
-
-### 3. Run with Docker
+### 2. Run with Docker
 
 ```bash
 docker-compose up --build
