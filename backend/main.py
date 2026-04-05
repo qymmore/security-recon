@@ -1,8 +1,12 @@
-from fastapi import FastAPI, BackgroundTasks, Depends
+from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
+
 from database import SessionLocal, engine
 import models
-from scanner import run_scan
+from tasks import run_full_scan
+from fastapi import WebSocket
+import asyncio
+import redis
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -15,32 +19,33 @@ def get_db():
     finally:
         db.close()
 
-def process_scan(scan_id: int, target: str):
-    db = SessionLocal()
-    scan = db.query(models.Scan).filter(models.Scan.id == scan_id).first()
-
-    scan.status = "running"
-    db.commit()
-
-    result = run_scan(target)
-
-    scan.status = "completed"
-    scan.result = result
-    db.commit()
-    db.close()
-
 @app.post("/scan")
-def create_scan(target: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def create_scan(target: str, db: Session = Depends(get_db)):
     scan = models.Scan(target=target, status="pending")
     db.add(scan)
     db.commit()
     db.refresh(scan)
 
-    background_tasks.add_task(process_scan, scan.id, target)
+    run_full_scan.delay(scan.id, target)
 
     return {"scan_id": scan.id}
 
 @app.get("/scan/{scan_id}")
 def get_scan(scan_id: int, db: Session = Depends(get_db)):
-    scan = db.query(models.Scan).filter(models.Scan.id == scan_id).first()
-    return scan
+    return db.query(models.Scan).get(scan_id)
+
+redis_client = redis.Redis(host="redis", port=6379, decode_responses=True)
+
+@app.websocket("/ws/{scan_id}")
+async def websocket_endpoint(websocket: WebSocket, scan_id: int):
+    print(f"WebSocket connection attempt for scan {scan_id}")
+
+    await websocket.accept()
+    print("WebSocket connected")
+
+    try:
+        while True:
+            await websocket.send_text(f"connected to scan {scan_id}")
+            await asyncio.sleep(2)
+    except:
+        print("WebSocket disconnected")
