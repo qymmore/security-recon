@@ -19,7 +19,7 @@ def send_update(scan_id, status, data=None):
         "status": status,
         "data": data
     }
-    publish_update(f"scan:{scan_id}", str(payload))
+    publish_update(scan_id, payload)
 
 
 @celery.task

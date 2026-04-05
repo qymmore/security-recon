@@ -7,10 +7,20 @@ from tasks import run_full_scan
 from fastapi import WebSocket
 import asyncio
 import redis
+from redis_client import subscribe
+from fastapi.middleware.cors import CORSMiddleware
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or ["http://localhost:3000"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def get_db():
     db = SessionLocal()
@@ -38,14 +48,7 @@ redis_client = redis.Redis(host="redis", port=6379, decode_responses=True)
 
 @app.websocket("/ws/{scan_id}")
 async def websocket_endpoint(websocket: WebSocket, scan_id: int):
-    print(f"WebSocket connection attempt for scan {scan_id}")
-
     await websocket.accept()
-    print("WebSocket connected")
 
-    try:
-        while True:
-            await websocket.send_text(f"connected to scan {scan_id}")
-            await asyncio.sleep(2)
-    except:
-        print("WebSocket disconnected")
+    async for message in subscribe(scan_id):
+        await websocket.send_text(message)

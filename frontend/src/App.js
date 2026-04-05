@@ -3,11 +3,18 @@ import React, { useState } from "react";
 function App() {
   const [target, setTarget] = useState("");
   const [logs, setLogs] = useState([]);
+  const API_BASE = "http://localhost:8000";
 
-  const startScan = async () => {
-    const res = await fetch("http://localhost:8000/scan?target=" + target, {
-      method: "POST",
+ const startScan = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/scan?target=${target}`, {
+      method: "POST"
     });
+
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+
     const data = await res.json();
 
     const ws = new WebSocket(`ws://localhost:8000/ws/${data.scan_id}`);
@@ -15,7 +22,11 @@ function App() {
     ws.onmessage = (event) => {
       setLogs((prev) => [...prev, event.data]);
     };
-  };
+
+  } catch (err) {
+    console.error("ERROR:", err);
+  }
+};
 
   return (
     <div style={{ padding: 20 }}>
